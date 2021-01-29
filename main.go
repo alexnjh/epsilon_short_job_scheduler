@@ -19,6 +19,7 @@ import (
   corelisters "k8s.io/client-go/listers/core/v1"
   metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
   configparser "github.com/bigkevmcd/go-configparser"
+  communication "github.com/alexnjh/epsilon/communication"
 )
 
 const (
@@ -128,7 +129,7 @@ func main() {
   pod_lister := kubefactory.Core().V1().Pods().Lister()
 
   // Attempt to connect to the rabbitMQ server
-  comm, err := NewRabbitMQCommunication(fmt.Sprintf("amqp://%s:%s@%s:%s/",mqUser, mqPass, mqHost, mqPort))
+  comm, err := communication.NewRabbitMQCommunication(fmt.Sprintf("amqp://%s:%s@%s:%s/",mqUser, mqPass, mqHost, mqPort))
   if err != nil {
     log.Fatalf(err.Error())
   }
@@ -201,7 +202,7 @@ func main() {
 
 // Does scheduling operations and should be executed in a goroutine
 func ScheduleProcess(
-  comm Communication,
+  comm communication.Communication,
   s *ShortJobScheduler,
   client kubernetes.Interface,
   podLister corelisters.PodLister,
@@ -219,7 +220,7 @@ func ScheduleProcess(
     timestamp := time.Now()
 
     // Convert json message to schedule request object
-    var req ScheduleRequest
+    var req communication.ScheduleRequest
 
     if err := json.Unmarshal(d.Body, &req); err != nil {
         panic(err)
@@ -265,7 +266,7 @@ func ScheduleProcess(
           req.LastBackOffTime = req.LastBackOffTime*2
           req.Message = err.Error()
 
-          respBytes, err := json.Marshal(RetryRequest{req,receiveQueue})
+          respBytes, err := json.Marshal(communication.RetryRequest{req,receiveQueue})
           if err != nil {
             log.Fatalf("%s", err)
           }
@@ -298,7 +299,7 @@ func ScheduleProcess(
 
 }
 
-func SendExperimentPayload(comm Communication, obj *corev1.Pod, in time.Time, out time.Time, queueName string, suggestedHost string, hostname string){
+func SendExperimentPayload(comm communication.Communication, obj *corev1.Pod, in time.Time, out time.Time, queueName string, suggestedHost string, hostname string){
 
   // Deep copy as modifications will be made to the pod
   pod := obj.DeepCopy()
@@ -322,9 +323,9 @@ func SendExperimentPayload(comm Communication, obj *corev1.Pod, in time.Time, ou
   }
 }
 
-func sendExperimentPayload(comm Communication, pod *corev1.Pod, in time.Time, out time.Time, queueName string, hostname string) bool{
+func sendExperimentPayload(comm communication.Communication, pod *corev1.Pod, in time.Time, out time.Time, queueName string, hostname string) bool{
 
-  respBytes, err := json.Marshal(ExperimentPayload{Type:"Scheduler",InTime:in,OutTime:out,Pod:pod,Hostname: hostname})
+  respBytes, err := json.Marshal(communication.ExperimentPayload{Type:"Scheduler",InTime:in,OutTime:out,Pod:pod,Hostname: hostname})
   if err != nil {
     log.Fatalf("%s", err)
   }
